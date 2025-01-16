@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Attendance Detail</title>
+    <style>
+        @page {
+            size: 8.5in 13in landscape;
+            margin: 0.1in;
+            margin-left: 80px;
+            margin-right: 80px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 8px;
+        }
+        .header {
+            position: relative;
+            text-align: center;
+        }
+        .header-image {
+            display: inline-block;
+        }
+        .report-title {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 12px;
+        }
+        .school-year {
+            font-weight: bold;
+            margin-left: 2px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 2px -2px 1px 1px;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            white-space: nowrap;
+            transform: rotate(180deg);
+            font-size: 8px;
+            line-height: 1;
+            padding: 5px 0;
+        }
+        .course-column {
+            width: 25px;
+            max-width: 25px;
+            padding: 0;
+        }
+        .check {
+            color: black;
+            font-weight: bold;
+        }
+        .cross {
+            color: white;
+        }
+        .column-name-bold {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .date-column { width: 10%; }
+        .time-column { width: 8%; }
+        .name-column { width: 17%; }
+        .purpose-column { width: 22%; }
+        .footer {
+            text-align: right;
+            font-size: 10px;
+            margin-top: 10px;
+        }
+        .last-page-footer {
+            page-break-inside: avoid;
+            margin-top: 20px;
+        }
+        .purpose-summary {
+            margin-top: 30px;
+            width: 50%;
+            margin: 0 auto;
+            border-collapse: collapse;
+        }
+        .purpose-summary th, .purpose-summary td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: left;
+        }
+        .course-summary {
+            margin-top: 0px;
+            width: 100%;
+            page-break-inside: avoid;
+        }
+        .course-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .course-summary-item {
+            text-align: left;
+            border: none;
+        }
+        .full-width-header {
+            width: 100%;
+            background-color: #ccc;
+            padding: 10px;
+            text-align: center;
+            color: black;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    {% for group in attendance_groups %}
+    <div class="header">
+        <div class="header-image">
+            <img src="https://i.imgur.com/WR78O01.png" alt="GJCLibrary header" />
+        </div>
+        <div class="report-title">
+            Updated Daily Record of Library Users <span class="school-year">SY: {{ school_year }}  {{ dynamic_date }}</span>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="date-column column-name-bold">Date</th>
+                <th class="time-column column-name-bold">Time</th>
+                <th class="name-column column-name-bold">Name</th>
+                {% for course in vertical_courses %}
+                <th class="course-column">
+                    <div class="vertical-text">
+                        {% for letter in course %}
+                            {% if letter != "-" %}
+                                {{ letter }}<br>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </th>
+                {% endfor %}
+                <th class="purpose-column column-name-bold">Purpose of Visit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for attendance in group %}
+            <tr>
+                <td>{{ attendance.date }}</td>
+                <td>{{ attendance.time }}</td>
+                <td>{{ attendance.name }}</td>
+                {% for check in attendance.classification %}
+                <td class="course-column">
+                    {% if check == '✓' %}
+                    <span class="check">✓</span>
+                    {% else %}
+                    <span class="cross">X</span>
+                    {% endif %}
+                </td>
+                {% endfor %}
+                <td>{{ attendance.purpose }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Page <pdf:pagenumber> of <pdf:pagecount>
+    </div>
+
+    {% if forloop.last %}
+    <div class="last-page-footer">
+        <div style="page-break-after: always;"></div>
+        <div class="header">
+            <img src="https://i.imgur.com/SO5EWfP.png" alt="GJCLibrary header" />
+            <h2>Daily Record of Library Users SY: {{ school_year }}  {{ dynamic_date }}</h2>
+        </div>
+
+       
+
+        <h1 class="full-width-header">Total Attendance by Purpose - {{ dynamic_date }}</h1>
+        <table class="purpose-summary">
+            <tr>
+                {% for purpose, _ in purpose_totals.items %}
+                <th>{{ purpose }}</th>
+                {% endfor %}
+            </tr>
+            <tr>
+                {% for _, count in purpose_totals.items %}
+                <td>{{ count }}</td>
+                {% endfor %}
+            </tr>
+        </table>
+    </div>
+    {% else %}
+    <div style="page-break-after: always;"></div>
+    {% endif %}
+    {% endfor %}
+</body>
+</html>
