@@ -2,7 +2,6 @@ import csv
 import logging
 import sqlite3
 from datetime import datetime
-import re
 
 # Configure logging
 logging.basicConfig(
@@ -12,37 +11,26 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-def normalize_datetime_string(date_string):
+def parse_datetime(date_str, time_str):
     """
-    Normalize the datetime string to handle extended precision microseconds
+    Parse and combine date and time strings into a datetime object
     """
-    # Remove timezone if present
-    if '+' in date_string:
-        date_string = date_string.split('+')[0]
-    
-    # If there are microseconds (digits after decimal point)
-    if '.' in date_string:
-        # Split into main part and microseconds
-        main_part, microseconds = date_string.split('.')
-        # Take only first 6 digits of microseconds
-        microseconds = microseconds[:6]
-        # Recombine
-        return f"{main_part}.{microseconds}"
-    
-    return date_string
-
-def parse_datetime(date_string):
-    """
-    Parse datetime string after normalizing it
-    """
-    normalized_date = normalize_datetime_string(date_string)
     try:
-        return datetime.strptime(normalized_date, '%Y-%m-%dT%H:%M:%S.%f')
-    except ValueError:
-        try:
-            return datetime.strptime(normalized_date, '%Y-%m-%dT%H:%M:%S')
-        except ValueError:
-            raise ValueError(f"Unable to parse date string: {date_string}")
+        # Parse date (assuming MM/DD/YYYY format)
+        date_obj = datetime.strptime(date_str, '%m/%d/%Y')
+        
+        # Parse time (12-hour format with AM/PM)
+        time_obj = datetime.strptime(time_str, '%I:%M %p')
+        
+        # Combine date and time
+        combined_datetime = datetime.combine(
+            date_obj.date(),
+            time_obj.time()
+        )
+        
+        return combined_datetime
+    except ValueError as e:
+        raise ValueError(f"Error parsing date/time: {date_str} {time_str}. Error: {str(e)}")
 
 def import_attendance_data():
     success_count = 0
@@ -57,19 +45,19 @@ def import_attendance_data():
     
     try:
         # Connect to SQLite database
-        conn = sqlite3.connect('db4.sqlite3')
+        conn = sqlite3.connect('db5.sqlite3')
         cursor = conn.cursor()
         
-        with open('attendance.csv', 'r', encoding='utf-8') as file:
+        with open('attendance_1-13.csv', 'r', encoding='utf-8') as file:
             csv_reader = csv.DictReader(file)
             
             for row_number, row in enumerate(csv_reader, start=2):  # Start from 2 to account for header
                 try:
-                    # Parse the datetime
-                    time_in_date = parse_datetime(row['Time In Date'])
+                    # Combine and parse the date and time
+                    time_in_date = parse_datetime(row['Date'], row['Time'])
                     
-                    # Format for SQLite (standard format with 6-digit microseconds)
-                    formatted_date = time_in_date.strftime('%Y-%m-%d %H:%M:%S.%f')
+                    # Format for SQLite
+                    formatted_date = time_in_date.strftime('%Y-%m-%d %H:%M:%S')
                     
                     # Prepare data tuple for insertion
                     data = (
@@ -91,7 +79,7 @@ def import_attendance_data():
                 except Exception as e:
                     error_count += 1
                     logging.error(f"Row {row_number}: Failed to import attendance record for {row.get('Full Name', 'Unknown')}.")
-                    logging.error(f"Raw date value: {row.get('Time In Date', 'No date found')}")
+                    logging.error(f"Raw date: {row.get('Date', 'No date')} time: {row.get('Time', 'No time')}")
                     logging.error(f"Error details: {str(e)}")
                     conn.rollback()
                     continue

@@ -85,6 +85,7 @@ class AttendanceReportView(View):
         attendance_list = []
         course_totals = defaultdict(int)
         purpose_totals = defaultdict(int)
+        total_attendance = 0
 
         short_names = self.get_classification_short_names()
         all_classifications = self.get_classifications()
@@ -97,6 +98,7 @@ class AttendanceReportView(View):
             for classification in all_classifications:
                 if classification == attendance.classification:
                     classification_checks.append('✓')
+                    total_attendance += 1  # Increment total for each attendance
                 else:
                     classification_checks.append('')
 
@@ -122,7 +124,16 @@ class AttendanceReportView(View):
         course_totals_items = list(course_totals.items())
         batched_course_totals = self.batch_items(course_totals_items, 5)
 
-        return attendance_list, batched_course_totals, dict(purpose_totals), date_purposes
+        course_totals_list = []
+        for classification in self.get_classifications():
+            short_name = self.get_classification_short_names()[classification]
+            course_totals_list.append(course_totals[short_name])
+
+        # Calculate total purpose
+        total_purpose = sum(purpose_totals.values())
+
+        return attendance_list, batched_course_totals, dict(purpose_totals), date_purposes, total_attendance, course_totals_list, total_purpose
+
 
     def get(self, request):
         date_str = request.GET.get('date')
@@ -131,11 +142,11 @@ class AttendanceReportView(View):
         else:
             selected_date = timezone.now().date()
 
-        attendance_list, batched_course_totals, purpose_totals, date_purposes = self.get_attendance_data(selected_date)
-
+        attendance_list, batched_course_totals, purpose_totals, date_purposes, total_attendance, course_totals_list, total_purpose = self.get_attendance_data(selected_date)
+    
         group_size = 25
         attendance_groups = [attendance_list[i:i + group_size] 
-                           for i in range(0, len(attendance_list), group_size)]
+                        for i in range(0, len(attendance_list), group_size)]
 
         dynamic_purposes = {purpose: purpose_totals.get(purpose, 0) for purpose in date_purposes}
 
@@ -147,7 +158,11 @@ class AttendanceReportView(View):
             'school_year': f"{selected_date.year}-{selected_date.year + 1}",
             'dynamic_date': selected_date.strftime('%B %d, %Y'),
             'uncategorized_total': dict(batched_course_totals[0]).get('Faculty', 0),
+            'total_attendance': total_attendance,
+            'course_totals_list': course_totals_list,
+            'total_purpose': total_purpose,
         }
+
 
         # Render the template
         response = render(request, self.template_name, context)
