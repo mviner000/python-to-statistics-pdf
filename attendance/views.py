@@ -13,6 +13,15 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from django.http import HttpResponse
 
+from django.views import View
+from django.shortcuts import render
+from django.http import HttpResponse
+from io import BytesIO
+from xhtml2pdf import pisa
+from django.template.loader import get_template
+from collections import defaultdict
+from django.utils import timezone
+
 
 class DailyStatisticsReportView(View):
     template_name = 'attendance_report_total_per_day.html'
@@ -288,3 +297,163 @@ class AttendanceReportView(View):
         response['Content-Disposition'] = f'attachment; filename="attendance_report_{selected_date}.pdf"'
         response.write(pdf)
         return response
+    
+class HourlyCourseSummaryView(View):
+    template_name = 'hourly_course_summary_pdf.html'
+    
+    def get_classifications(self):
+        return [
+            'JUNIOR HIGH SCHOOL', 
+            'Accountancy, Business and Management (ABM)', 
+            'Science, Technology, Engineering and Mathematics', 
+            'Humanities and Social Sciences', 
+            'General Academic Strand', 
+            'BEEd', 
+            'BSEd - English',
+            'BSEd - Soc Stud', 
+            'BSA', 
+            'BSAIS', 
+            'BSMA', 
+            'BSIA', 
+            'BSBA', 
+            'BSBA-FM',
+            'BSBA-HRDM', 
+            'BSBA-MM', 
+            'BSIT', 
+            'BSHM',
+            'Faculty'
+        ]
+
+    def get_classification_short_names(self):
+        return {
+            'JUNIOR HIGH SCHOOL': 'JHS',
+            'Accountancy, Business and Management (ABM)': 'ABM',
+            'Science, Technology, Engineering and Mathematics': 'STEM',
+            'Humanities and Social Sciences': 'HUMMS',
+            'General Academic Strand': 'GAS',
+            'BEEd': 'BEEd',
+            'BSEd - English': 'BSEd-Eng',
+            'BSEd - Soc Stud': 'BSEd-SocStud',
+            'BSA': 'BSA',
+            'BSAIS': 'BSAIS',
+            'BSMA': 'BSMA',
+            'BSIA': 'BSIA',
+            'BSBA': 'BSBA',
+            'BSBA-FM': 'BSBA-FM',
+            'BSBA-HRDM': 'BSBA-HRDM',
+            'BSBA-MM': 'BSBA-MM',
+            'BSIT': 'BSIT',
+            'BSHM': 'BSHM',
+            'Faculty': 'Faculty'
+        }
+
+    def get_hour_ranges(self):
+        return [
+            ('07:00', '08:00'), ('08:00', '09:00'),
+            ('09:00', '10:00'), ('10:00', '11:00'),
+            ('11:00', '12:00'), ('12:00', '13:00'),
+            ('13:00', '14:00'), ('14:00', '15:00'),
+            ('15:00', '16:00'), ('16:00', '17:00'),
+            ('17:00', '18:00')
+        ]
+
+    def format_time_range(self, start, end):
+        def convert_to_12hr(time_str):
+            time_obj = datetime.strptime(time_str, '%H:%M')
+            hour = int(time_obj.strftime('%I'))  # Get hour without leading zero
+            minute = time_obj.strftime('%M')
+            return f"{hour}:{minute}"
+
+        start_time = convert_to_12hr(start)
+        end_time = convert_to_12hr(end)
+        return f"{start_time}-{end_time}"
+
+    def get_hourly_data(self, date):
+        # Get all attendance records for the day
+        attendances = Attendance.objects.filter(
+            time_in_date__date=date
+        ).order_by('time_in_date')
+
+        classifications = self.get_classifications()
+        grid_data = []
+        column_totals = [0] * len(classifications)
+        grand_total = 0
+
+        # Process each time range
+        for start_hour, end_hour in self.get_hour_ranges():
+            time_key = self.format_time_range(start_hour, end_hour)
+            
+            # Initialize row counts
+            counts = [0] * len(classifications)
+            row_total = 0
+            
+            # Count attendances for this hour range
+            start_time = datetime.strptime(start_hour, '%H:%M').time()
+            end_time = datetime.strptime(end_hour, '%H:%M').time()
+            
+            for attendance in attendances:
+                attendance_time = attendance.time_in_date.time()
+                if start_time <= attendance_time < end_time:
+                    try:
+                        class_index = classifications.index(attendance.classification)
+                        counts[class_index] += 1
+                        column_totals[class_index] += 1
+                        row_total += 1
+                        grand_total += 1
+                    except ValueError:
+                        # Skip if classification not in our list
+                        continue
+            
+            grid_data.append({
+                'time_range': time_key,
+                'counts': counts,
+                'row_total': row_total
+            })
+
+        return grid_data, column_totals, grand_total
+
+    def generate_pdf(self, template_path, context):
+        template = get_template(template_path)
+        html = template.render(context)
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        
+        if not pdf.err:
+            return HttpResponse(
+                result.getvalue(),
+                content_type='application/pdf'
+            )
+        return None
+
+    def get(self, request):
+        date_str = request.GET.get('date')
+        
+        if date_str:
+            try:
+                date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return HttpResponse("Invalid date format. Use YYYY-MM-DD", status=400)
+        else:
+            date = timezone.now().date()
+        
+        grid_data, column_totals, grand_total = self.get_hourly_data(date)
+        
+        # Convert classifications to short names for display
+        short_names = self.get_classification_short_names()
+        display_classifications = [short_names[c] for c in self.get_classifications()]
+        
+        context = {
+            'date': date.strftime('%B %d, %Y'),
+            'classifications': display_classifications,
+            'grid_data': grid_data,
+            'column_totals': column_totals,
+            'grand_total': grand_total
+        }
+        
+        pdf = self.generate_pdf(self.template_name, context)
+        if pdf:
+            response = pdf
+            response['Content-Disposition'] = f'attachment; filename="hourly_course_summary_{date}.pdf"'
+            return response
+        
+        return HttpResponse("Error Rendering PDF", status=400)

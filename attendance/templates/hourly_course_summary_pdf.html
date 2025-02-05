@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: 8.5in 13in landscape;
+            margin: 0.1in;
+            margin-left: 80px;
+            margin-right: 80px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 9px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            table-layout: fixed;
+        }
+        .summary-table th, .summary-table td {
+            border: 1px solid black;
+            padding-top: 2px;
+            padding-bottom: 1px;
+            text-align: center;
+        }
+        .summary-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .time-column {
+            width: 80px;
+            font-weight: bold;
+            text-align: left;
+            background-color: #f2f2f2;
+        }
+        .total-row th, .total-row td {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .total-column {
+            width: 60px;
+            font-weight: bold;
+            background-color: #f2f2f2;
+        }
+        .date {
+            text-align: right;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        .zero-count {
+            color: white;
+        }
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            white-space: nowrap;
+            transform: rotate(180deg);
+            font-size: 8px;
+            line-height: 1;
+            padding: 5px 0;
+        }
+        .course-column {
+            width: 25px;
+            max-width: 25px;
+            padding: 0;
+        }
+        .column-name-bold {
+            font-weight: bold;
+            font-size: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Hourly Course Summary Report</h1>
+    </div>
+    
+    <div class="date">
+        Date: {{ date }}
+    </div>
+
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th class="time-column column-name-bold">Time</th>
+                {% for classification in classifications %}
+                <th class="course-column">
+                    <div class="vertical-text">
+                        {% for letter in classification %}
+                            {% if letter != "-" %}
+                                {{ letter }}<br>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </th>
+                {% endfor %}
+                <th class="total-column column-name-bold">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in grid_data %}
+            <tr>
+                <td class="time-column">{{ row.time_range }}</td>
+                {% for count in row.counts %}
+                <td class="course-column {% if count == 0 %}zero-count{% endif %}">{{ count }}</td>
+                {% endfor %}
+                <td class="total-column">{{ row.row_total }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <th>Total</th>
+                {% for total in column_totals %}
+                <td class="course-column {% if total == 0 %}zero-count{% endif %}">{{ total }}</td>
+                {% endfor %}
+                <td class="total-column">{{ grand_total }}</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
