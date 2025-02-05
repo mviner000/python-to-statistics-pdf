@@ -22,6 +22,16 @@ from django.template.loader import get_template
 from collections import defaultdict
 from django.utils import timezone
 
+import calendar
+from datetime import datetime, timedelta
+from django.http import HttpResponse
+from django.views import View
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from io import BytesIO
+from collections import defaultdict
+from .models import Attendance
+
 
 class DailyStatisticsReportView(View):
     template_name = 'attendance_report_total_per_day.html'
@@ -457,3 +467,120 @@ class HourlyCourseSummaryView(View):
             return response
         
         return HttpResponse("Error Rendering PDF", status=400)
+    
+class MonthlyCourseSummaryView(View):
+    template_name = 'monthly_course_summary_pdf.html'
+
+    def get_classifications(self):
+        return HourlyCourseSummaryView().get_classifications()
+
+    def get_classification_short_names(self):
+        return HourlyCourseSummaryView().get_classification_short_names()
+
+    def get_hour_ranges(self):
+        return HourlyCourseSummaryView().get_hour_ranges()
+
+    def format_time_range(self, start, end):
+        return HourlyCourseSummaryView().format_time_range(start, end)
+
+    def process_hourly_data(self, attendances, date):
+        classifications = self.get_classifications()
+        grid_data = []
+        column_totals = [0] * len(classifications)
+        grand_total = 0
+
+        for start_hour, end_hour in self.get_hour_ranges():
+            time_key = self.format_time_range(start_hour, end_hour)
+            counts = [0] * len(classifications)
+            row_total = 0
+
+            start_time = datetime.strptime(start_hour, '%H:%M').time()
+            end_time = datetime.strptime(end_hour, '%H:%M').time()
+
+            for attendance in attendances:
+                attendance_time = attendance.time_in_date.time()
+                if start_time <= attendance_time < end_time:
+                    try:
+                        class_index = classifications.index(attendance.classification)
+                        counts[class_index] += 1
+                        column_totals[class_index] += 1
+                        row_total += 1
+                        grand_total += 1
+                    except ValueError:
+                        continue
+
+            grid_data.append({
+                'time_range': time_key,
+                'counts': counts,
+                'row_total': row_total
+            })
+
+        return grid_data, column_totals, grand_total
+
+    def get_monthly_data(self, year, month):
+        num_days = calendar.monthrange(year, month)[1]
+        dates = [datetime(year, month, day).date() for day in range(1, num_days + 1)]
+
+        start_date = dates[0]
+        end_date = dates[-1]
+        attendances = Attendance.objects.filter(
+            time_in_date__date__gte=start_date,
+            time_in_date__date__lte=end_date
+        ).order_by('time_in_date')
+
+        attendances_by_date = defaultdict(list)
+        for attendance in attendances:
+            date = attendance.time_in_date.date()
+            attendances_by_date[date].append(attendance)
+
+        monthly_data = []
+        for date in dates:
+            daily_attendances = attendances_by_date.get(date, [])
+            grid_data, column_totals, grand_total = self.process_hourly_data(daily_attendances, date)
+            monthly_data.append({
+                'date': date.strftime('%B %d, %Y'),
+                'grid_data': grid_data,
+                'column_totals': column_totals,
+                'grand_total': grand_total
+            })
+
+        return monthly_data
+
+    def generate_pdf(self, template_path, context):
+        template = get_template(template_path)
+        html = template.render(context)
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        if not pdf.err:
+            return HttpResponse(result.getvalue(), content_type='application/pdf')
+        return None
+
+    def get(self, request):
+        month = request.GET.get('month')
+        year = request.GET.get('year')
+
+        try:
+            month = int(month)
+            year = int(year)
+            if month < 1 or month > 12:
+                raise ValueError
+        except (ValueError, TypeError):
+            return HttpResponse("Invalid month or year parameters. Use integers (e.g., month=1&year=2025)", status=400)
+
+        monthly_data = self.get_monthly_data(year, month)
+        short_names = self.get_classification_short_names()
+        display_classifications = [short_names[cls] for cls in self.get_classifications()]
+
+        context = {
+            'month': datetime(year=year, month=month, day=1).strftime('%B'),
+            'year': year,
+            'monthly_data': monthly_data,
+            'classifications': display_classifications,
+        }
+
+        pdf = self.generate_pdf(self.template_name, context)
+        if pdf:
+            response = pdf
+            response['Content-Disposition'] = f'attachment; filename="monthly_summary_{month}_{year}.pdf"'
+            return response
+        return HttpResponse("Error generating PDF", status=500)
