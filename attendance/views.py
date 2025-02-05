@@ -4,12 +4,121 @@ from django.shortcuts import render
 from django.views.generic import View
 from django.utils import timezone
 from collections import defaultdict
-from datetime import datetime
+from django.db.models import Count
+from django.db.models import Q
+from datetime import datetime, time
 import pandas as pd
 from .models import Attendance
 from xhtml2pdf import pisa
 from io import BytesIO
 from django.http import HttpResponse
+
+
+class DailyStatisticsReportView(View):
+    template_name = 'attendance_report_total_per_day.html'
+
+    def get_time_ranges(self, target_date):
+        """Generate time ranges for the day from 7 AM to 5 PM"""
+        time_counts = {}
+        for hour in range(7, 18):  # 7am to 5pm
+            start_time = timezone.make_aware(datetime.combine(target_date, time(hour, 0)))
+            end_time = timezone.make_aware(datetime.combine(target_date, time(hour + 1, 0)))
+            time_str = start_time.strftime('%I:%M %p') + ' - ' + end_time.strftime('%I:%M %p')
+            time_counts[time_str] = {
+                'start_time': start_time,
+                'end_time': end_time
+            }
+        return time_counts
+
+    def get_attendance_data(self, target_date):
+        # Create time range for the entire day
+        start_of_day = timezone.make_aware(datetime.combine(target_date, time.min))
+        end_of_day = timezone.make_aware(datetime.combine(target_date, time.max))
+        
+        # Get base queryset for the day
+        attendance_data = Attendance.objects.filter(
+            time_in_date__range=(start_of_day, end_of_day)
+        )
+
+        # Get time ranges
+        time_ranges = self.get_time_ranges(target_date)
+        time_counts = {}
+
+        # Senior High School classifications
+        shs_classifications = [
+            'Accountancy, Business and Management (ABM)',
+            'Science, Technology, Engineering and Mathematics',
+            'Humanities and Social Sciences',
+            'General Academic Strand'
+        ]
+
+        # Calculate counts for each time range
+        for time_str, time_range in time_ranges.items():
+            counts = attendance_data.filter(
+                time_in_date__gte=time_range['start_time'],
+                time_in_date__lt=time_range['end_time']
+            ).aggregate(
+                Faculty=Count('id', filter=Q(classification='Faculty')),
+                Junior_High_School=Count('id', filter=Q(classification='JUNIOR HIGH SCHOOL')),
+                Senior_High_School=Count('id', filter=Q(classification__in=shs_classifications)),
+                College=Count('id', filter=Q(
+                    classification__in=[
+                        'BEEd', 'BSEd - English', 'BSEd - Soc Stud',
+                        'BSA', 'BSAIS', 'BSMA', 'BSIA', 'BSBA',
+                        'BSBA-FM', 'BSBA-HRDM', 'BSBA-MM', 'BSIT', 'BSHM'
+                    ]
+                ))
+            )
+            time_counts[time_str] = counts
+
+        # Calculate totals
+        total_faculty = sum(count['Faculty'] for count in time_counts.values())
+        total_jhs = sum(count['Junior_High_School'] for count in time_counts.values())
+        total_shs = sum(count['Senior_High_School'] for count in time_counts.values())
+        total_college = sum(count['College'] for count in time_counts.values())
+
+        return time_counts, total_faculty, total_jhs, total_shs, total_college
+
+    def get(self, request):
+        # Get date from request or use current date
+        date_str = request.GET.get('date')
+        if date_str:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        else:
+            target_date = timezone.now().date()
+
+        # Get attendance data
+        time_counts, total_faculty, total_jhs, total_shs, total_college = self.get_attendance_data(target_date)
+
+        # Prepare context
+        context = {
+            'time_counts': time_counts,
+            'total_faculty': total_faculty,
+            'total_jhs': total_jhs,
+            'total_shs': total_shs,
+            'total_college': total_college,
+            'dynamic_date': target_date.strftime('%B %d, %Y'),
+            'school_year': f"{target_date.year - 1}-{target_date.year}",
+        }
+
+        # Render to HTML
+        response = render(request, self.template_name, context)
+        
+        # Convert to PDF
+        buffer = BytesIO()
+        pisa.CreatePDF(response.content, dest=buffer)
+        
+        # Create response
+        pdf = buffer.getvalue()
+        buffer.close()
+        
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"daily_statistics_{target_date.strftime('%Y-%m-%d')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.write(pdf)
+        
+        return response
+
 
 class AttendanceReportView(View):
     template_name = 'attendance_report_uncounted_per_day.html'
@@ -144,7 +253,7 @@ class AttendanceReportView(View):
 
         attendance_list, batched_course_totals, purpose_totals, date_purposes, total_attendance, course_totals_list, total_purpose = self.get_attendance_data(selected_date)
     
-        group_size = 25
+        group_size = 30
         attendance_groups = [attendance_list[i:i + group_size] 
                         for i in range(0, len(attendance_list), group_size)]
 
@@ -155,7 +264,7 @@ class AttendanceReportView(View):
             'vertical_courses': self.get_vertical_courses(),
             'batched_course_totals': batched_course_totals,
             'purpose_totals': dynamic_purposes,
-            'school_year': f"{selected_date.year}-{selected_date.year + 1}",
+            'school_year': f"{selected_date.year - 1}-{selected_date.year}",
             'dynamic_date': selected_date.strftime('%B %d, %Y'),
             'uncategorized_total': dict(batched_course_totals[0]).get('Faculty', 0),
             'total_attendance': total_attendance,

@@ -1,6 +1,8 @@
 from django.urls import path
-from .views import AttendanceReportView
+from .views import AttendanceReportView, DailyStatisticsReportView
 
 urlpatterns = [
-    path('api/report/', AttendanceReportView.as_view(), name='attendance-report'),
+    path('report/uncounted', AttendanceReportView.as_view(), name='attendance-report'),
+    path('report/statistics', DailyStatisticsReportView.as_view(), name='daily-statistics-report'),
+
 ]
