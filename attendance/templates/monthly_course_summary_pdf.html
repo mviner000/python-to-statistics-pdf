@@ -93,6 +93,13 @@
             text-align: center;
             font-size: 9px;
         }
+        .date-row th {
+            border: none !important;
+            text-align: right;
+            font-style: italic;
+            padding: 2px 0 10px 0; /* top, right, bottom, left */
+            background-color: transparent !important;
+        }
     </style>
 </head>
 <body>
@@ -107,12 +114,13 @@
     </div>
     {% endif %}
     
-    <div class="date">
-        Date: {{ daily.date }}
-    </div>
-
     <table class="summary-table">
         <thead>
+            <tr class="date-row">
+                <th colspan="{{ classifications|length|add:2 }}">
+                    Date: {{ daily.date }}
+                </th>
+            </tr>
             <tr>
                 <th class="time-column column-name-bold">Time</th>
                 {% for classification in classifications %}
