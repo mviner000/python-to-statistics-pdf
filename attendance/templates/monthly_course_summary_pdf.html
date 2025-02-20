@@ -4,173 +4,196 @@
     <meta charset="UTF-8">
     <style>
         @page {
-            size: 8.5in 13in landscape;
-            margin: 0.1in;
-            margin-left: 30px;
-            margin-right: 30px;
+            size: 13in 8.5in;
+            margin: 0.3in;
         }
+        
         body {
             font-family: Arial, sans-serif;
-            font-size: 9px;
-            position: relative;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .summary-table {
-            width: 48%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            table-layout: fixed;
-            float: left;
-            margin-right: 1%;
-        }
-        .summary-table th, .summary-table td {
-            border: 1px solid black;
-            padding-top: 2px;
-            padding-bottom: 1px;
-            text-align: center;
-        }
-        .summary-table th {
-            background-color: #f2f2f2;
-            font-weight: bold;
-        }
-        .time-column {
-            width: 80px;
-            font-weight: bold;
-            text-align: left;
-            background-color: #f2f2f2;
-        }
-        .total-row th, .total-row td {
-            background-color: #f2f2f2;
-            font-weight: bold;
-        }
-        .total-column {
-            width: 30px;
-            font-weight: bold;
-            background-color: #f2f2f2;
-        }
-        .date {
-            text-align: right;
-            margin-bottom: 20px;
-            font-style: italic;
-        }
-        .zero-count {
-            color: white;
-        }
-        .vertical-text {
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-            white-space: nowrap;
-            transform: rotate(180deg);
-            font-size: 8px;
-            line-height: 1;
-            padding: 5px 0;
-        }
-        .course-column {
-            width: 25px;
-            max-width: 25px;
+            font-size: 9pt;
+            margin: 0;
             padding: 0;
+            position: relative;
+            min-height: 100vh;
         }
-        .column-name-bold {
-            font-weight: bold;
-            font-size: 8px;
-        }
-        .page-break {
-            page-break-after: always;
-        }
-        .clearfix::after {
-            content: "";
-            clear: both;
-            display: table;
-        }
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+
+        .header {
+            position: relative;
             text-align: center;
-            font-size: 9px;
+            margin-top: -20px;
+            margin-bottom: 0px;
         }
+        
+        .header img {
+            display: inline-block;
+            max-width: 60%;
+            height: auto;
+        }
+        
+        .header h2 {
+            margin: 10px 0;
+            font-size: 14pt;
+            font-weight: bold;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 5px;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .summary-table th, 
+        .summary-table td {
+            border: 1px solid black;
+            padding: 2px;
+            text-align: center;
+            font-size: 8pt;
+        }
+
+        .time-column {
+            width: 220px;
+            text-align: center;
+            background-color: #f2f2f2;
+            padding: 2px 5px;
+        }
+
+        .time-text {
+            font-size: 7pt;
+            text-align: center;
+        }
+
+        .total-row th, 
+        .total-row td {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        .total-column {
+            width: 20px;
+            font-weight: bold;
+            background-color: #f2f2f2;
+        }
+
         .date-row th {
             border: none !important;
             text-align: right;
             font-style: italic;
-            padding: 2px 0 10px 0; /* top, right, bottom, left */
+            padding: 2px 0 10px 0;
             background-color: transparent !important;
+        }
+
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            white-space: nowrap;
+            transform: rotate(360deg);
+            font-size: 6pt;
+            line-height: 1;
+            padding: 1px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .course-column {
+            width: 4px; 
+            max-width: 4px;
+            padding: 0;
+        }
+
+        .zero-count {
+            color: white;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        .page-container {
+            margin-bottom: 5px;
+            position: relative;
+            padding-bottom: 30px; /* Space for footer */
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            font-size: 8pt;
+            font-style: italic;
+            padding: 5px;
+            text-align: right;
         }
     </style>
 </head>
 <body>
-    <div class="footer">
-        Page <span class="page-number"></span>
-    </div>
-
-    {% for daily in monthly_data %}
-    {% if forloop.counter0|divisibleby:4 %}
-    <div class="header">
-        <h1>Hourly Course Summary Report - {{ month }} {{ year }}</h1>
-    </div>
-    {% endif %}
-    
-    <table class="summary-table">
-        <thead>
-            <tr class="date-row">
-                <th colspan="{{ classifications|length|add:2 }}">
-                    Date: {{ daily.date }}
-                </th>
-            </tr>
-            <tr>
-                <th class="time-column column-name-bold">Time</th>
-                {% for classification in classifications %}
-                <th class="course-column">
-                    <div class="vertical-text">
-                        {% for letter in classification %}
-                            {% if letter != "-" %}
-                                {{ letter }}<br>
-                            {% endif %}
+    {% for group in grouped_data %}
+    <div class="page-container">
+        <div class="header">
+            <img src="https://i.imgur.com/SO5EWfP.png" alt="GJCLibrary header" />
+        </div>
+        
+        <div class="grid-container">
+            {% for daily in group %}
+            <table class="summary-table">
+                <thead>
+                    <tr class="date-row">
+                        <th colspan="{{ classifications|length|add:2 }}">
+                            Date: {{ daily.date }}
+                        </th>
+                    </tr>
+                    <tr>
+                        <th class="time-column">Time</th>
+                        {% for classification in classifications %}
+                        <th class="course-column">
+                            <div class="vertical-text">
+                                {% for letter in classification %}
+                                    {% if letter != "-" %}
+                                        {{ letter }}<br>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </th>
                         {% endfor %}
-                    </div>
-                </th>
-                {% endfor %}
-                <th class="total-column column-name-bold">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in daily.grid_data %}
-            <tr>
-                <td class="time-column">{{ row.time_range }}</td>
-                {% for count in row.counts %}
-                <td class="course-column {% if count == 0 %}zero-count{% endif %}">{{ count }}</td>
-                {% endfor %}
-                <td class="total-column">{{ row.row_total }}</td>
-            </tr>
+                        <th class="total-column">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in daily.grid_data %}
+                    <tr>
+                        <td class="time-column"><span class="time-text">{{ row.time_range }}</span></td>
+                        {% for count in row.counts %}
+                        <td class="course-column {% if count == 0 %}zero-count{% endif %}">{{ count }}</td>
+                        {% endfor %}
+                        <td class="total-column">{{ row.row_total }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total-row">
+                        <th>Total</th>
+                        {% for total in daily.column_totals %}
+                        <td class="course-column {% if total == 0 %}zero-count{% endif %}">{{ total }}</td>
+                        {% endfor %}
+                        <td class="total-column">{{ daily.grand_total }}</td>
+                    </tr>
+                </tbody>
+            </table>
             {% endfor %}
-            <tr class="total-row">
-                <th>Total</th>
-                {% for total in daily.column_totals %}
-                <td class="course-column {% if total == 0 %}zero-count{% endif %}">{{ total }}</td>
-                {% endfor %}
-                <td class="total-column">{{ daily.grand_total }}</td>
-            </tr>
-        </tbody>
-    </table>
-    {% if forloop.counter|divisibleby:4 or forloop.last %}
-    <div class="clearfix"></div>
-    {% if not forloop.last %}
-    <div class="page-break"></div>
-    {% endif %}
-    {% endif %}
-    {% endfor %}
+        </div>
 
-    <script type="text/javascript">
-        // Add page numbers to the footer
-        var pageCount = 1;
-        var pageNumberElements = document.getElementsByClassName('page-number');
-        for (var i = 0; i < pageNumberElements.length; i++) {
-            pageNumberElements[i].textContent = pageCount++;
-        }
-    </script>
+        <div class="footer">
+            Page {{ forloop.counter }} of {{ grouped_data|length }}
+        </div>
+
+        {% if not forloop.last %}
+        <div class="page-break"></div>
+        {% endif %}
+    </div>
+    {% endfor %}
 </body>
 </html>

@@ -13,6 +13,15 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from django.http import HttpResponse
 
+from django.shortcuts import render
+from django.views.generic import View
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+from django.conf import settings
+import os
+from weasyprint import HTML
+from weasyprint.text.fonts import FontConfiguration
+
 from django.views import View
 from django.shortcuts import render
 from django.http import HttpResponse
@@ -370,7 +379,7 @@ class HourlyCourseSummaryView(View):
     def format_time_range(self, start, end):
         def convert_to_12hr(time_str):
             time_obj = datetime.strptime(time_str, '%H:%M')
-            hour = int(time_obj.strftime('%I'))  # Get hour without leading zero
+            hour = int(time_obj.strftime('%I'))
             minute = time_obj.strftime('%M')
             return f"{hour}:{minute}"
 
@@ -472,16 +481,70 @@ class MonthlyCourseSummaryView(View):
     template_name = 'monthly_course_summary_pdf.html'
 
     def get_classifications(self):
-        return HourlyCourseSummaryView().get_classifications()
+        return [
+            'JUNIOR HIGH SCHOOL', 
+            'Accountancy, Business and Management (ABM)', 
+            'Science, Technology, Engineering and Mathematics', 
+            'Humanities and Social Sciences', 
+            'General Academic Strand', 
+            'BEEd', 
+            'BSEd - English',
+            'BSEd - Soc Stud', 
+            'BSA', 
+            'BSAIS', 
+            'BSMA', 
+            'BSIA', 
+            'BSBA', 
+            'BSBA-FM',
+            'BSBA-HRDM', 
+            'BSBA-MM', 
+            'BSIT', 
+            'BSHM',
+            'Faculty'
+        ]
 
     def get_classification_short_names(self):
-        return HourlyCourseSummaryView().get_classification_short_names()
+        return {
+            'JUNIOR HIGH SCHOOL': 'JHS',
+            'Accountancy, Business and Management (ABM)': 'ABM',
+            'Science, Technology, Engineering and Mathematics': 'STEM',
+            'Humanities and Social Sciences': 'HUMMS',
+            'General Academic Strand': 'GAS',
+            'BEEd': 'BEEd',
+            'BSEd - English': 'BSEd-Eng',
+            'BSEd - Soc Stud': 'BSEd-SocStud',
+            'BSA': 'BSA',
+            'BSAIS': 'BSAIS',
+            'BSMA': 'BSMA',
+            'BSIA': 'BSIA',
+            'BSBA': 'BSBA',
+            'BSBA-FM': 'BSBA-FM',
+            'BSBA-HRDM': 'BSBA-HRDM',
+            'BSBA-MM': 'BSBA-MM',
+            'BSIT': 'BSIT',
+            'BSHM': 'BSHM',
+            'Faculty': 'Faculty'
+        }
 
     def get_hour_ranges(self):
-        return HourlyCourseSummaryView().get_hour_ranges()
+        return [
+            ('07:00', '08:00'), ('08:00', '09:00'),
+            ('09:00', '10:00'), ('10:00', '11:00'),
+            ('11:00', '12:00'), ('12:00', '13:00'),
+            ('13:00', '14:00'), ('14:00', '15:00'),
+            ('15:00', '16:00'), ('16:00', '17:00'),
+            ('17:00', '18:00')
+        ]
 
     def format_time_range(self, start, end):
-        return HourlyCourseSummaryView().format_time_range(start, end)
+        def convert_to_hour(time_str):
+            time_obj = datetime.strptime(time_str, '%H:%M')
+            hour_12 = time_obj.strftime('%I')  # Get 12-hour format hour with leading zero
+            return str(int(hour_12))  # Convert to integer and back to string to remove leading zero
+        
+        start_time = convert_to_hour(start)
+        end_time = convert_to_hour(end)
+        return f"{start_time}-{end_time}"
 
     def process_hourly_data(self, attendances, date):
         classifications = self.get_classifications()
@@ -546,15 +609,6 @@ class MonthlyCourseSummaryView(View):
 
         return monthly_data
 
-    def generate_pdf(self, template_path, context):
-        template = get_template(template_path)
-        html = template.render(context)
-        result = BytesIO()
-        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
-        if not pdf.err:
-            return HttpResponse(result.getvalue(), content_type='application/pdf')
-        return None
-
     def get(self, request):
         month = request.GET.get('month')
         year = request.GET.get('year')
@@ -565,22 +619,70 @@ class MonthlyCourseSummaryView(View):
             if month < 1 or month > 12:
                 raise ValueError
         except (ValueError, TypeError):
-            return HttpResponse("Invalid month or year parameters. Use integers (e.g., month=1&year=2025)", status=400)
+            return HttpResponse("Invalid month or year parameters", status=400)
 
         monthly_data = self.get_monthly_data(year, month)
         short_names = self.get_classification_short_names()
         display_classifications = [short_names[cls] for cls in self.get_classifications()]
 
+        # Group the monthly data into sets of 4 for 2x2 grid layout
+        grouped_data = [monthly_data[i:i + 4] for i in range(0, len(monthly_data), 4)]
+
         context = {
             'month': datetime(year=year, month=month, day=1).strftime('%B'),
             'year': year,
-            'monthly_data': monthly_data,
+            'grouped_data': grouped_data,
             'classifications': display_classifications,
         }
 
-        pdf = self.generate_pdf(self.template_name, context)
-        if pdf:
-            response = pdf
-            response['Content-Disposition'] = f'attachment; filename="monthly_summary_{month}_{year}.pdf"'
-            return response
-        return HttpResponse("Error generating PDF", status=500)
+        # Render HTML template
+        html_string = render_to_string(self.template_name, context)
+        
+        # Configure fonts
+        font_config = FontConfiguration()
+        
+        # Generate PDF
+        html = HTML(string=html_string)
+        pdf = html.write_pdf(
+            stylesheets=[],
+            font_config=font_config
+        )
+        
+        # Create response
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="monthly_summary_{month}_{year}.pdf"'
+        
+        return response
+    
+class FilteredMonthlyCourseSummaryView(MonthlyCourseSummaryView):
+    def get_monthly_data(self, year, month):
+        num_days = calendar.monthrange(year, month)[1]
+        dates = [datetime(year, month, day).date() for day in range(1, num_days + 1)]
+
+        start_date = dates[0]
+        end_date = dates[-1]
+        attendances = Attendance.objects.filter(
+            time_in_date__date__gte=start_date,
+            time_in_date__date__lte=end_date
+        ).order_by('time_in_date')
+
+        attendances_by_date = defaultdict(list)
+        for attendance in attendances:
+            date = attendance.time_in_date.date()
+            attendances_by_date[date].append(attendance)
+
+        monthly_data = []
+        for date in dates:
+            daily_attendances = attendances_by_date.get(date, [])
+            grid_data, column_totals, grand_total = self.process_hourly_data(daily_attendances, date)
+            
+            # Skip days with zero total visitors
+            if grand_total > 0:
+                monthly_data.append({
+                    'date': date.strftime('%B %d, %Y'),
+                    'grid_data': grid_data,
+                    'column_totals': column_totals,
+                    'grand_total': grand_total
+                })
+
+        return monthly_data
