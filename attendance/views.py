@@ -659,6 +659,34 @@ class MonthlyCourseSummaryView(View):
                     'total': time_slot_totals[time_key]['total']
                 })
 
+        # Calculate top courses
+        classifications = self.get_classifications()
+        short_names = self.get_classification_short_names()
+        course_totals = []
+        for idx, cls in enumerate(classifications):
+            course_totals.append({
+                'name': short_names[cls],
+                'total': monthly_column_totals[idx]
+            })
+
+        sorted_course_totals = sorted(
+            course_totals, 
+            key=lambda x: x['total'], 
+            reverse=True
+        )
+
+
+        # Add rank to each course
+        for idx, course in enumerate(sorted_course_totals, start=1):
+            course['rank'] = idx
+
+        # Split into three columns
+        total_courses = len(sorted_course_totals)
+        chunk_size = (total_courses + 2) // 3  # Ceiling division
+        top_courses_col1 = sorted_course_totals[:chunk_size]
+        top_courses_col2 = sorted_course_totals[chunk_size:2*chunk_size]
+        top_courses_col3 = sorted_course_totals[2*chunk_size:]
+
         # Group the monthly data into sets of 4 for 2x2 grid layout
         grouped_data = [monthly_data[i:i + 4] for i in range(0, len(monthly_data), 4)]
 
@@ -669,7 +697,11 @@ class MonthlyCourseSummaryView(View):
             'classifications': display_classifications,
             'monthly_column_totals': monthly_column_totals,
             'monthly_grand_total': monthly_grand_total,
-            'time_slot_totals': ordered_time_slots,  # NEW CONTEXT VARIABLE
+            'time_slot_totals': ordered_time_slots,
+            'sorted_course_totals': sorted_course_totals,
+            'top_courses_col1': top_courses_col1,
+            'top_courses_col2': top_courses_col2,
+            'top_courses_col3': top_courses_col3,
         }
 
         # Render HTML template
