@@ -187,7 +187,7 @@
         </div>
 
         <div class="footer">
-            Page {{ forloop.counter }} of {{ grouped_data|length }}
+            Page {{ forloop.counter }} of {{ grouped_data|length|add:1 }}
         </div>
 
         {% if not forloop.last %}
@@ -195,5 +195,59 @@
         {% endif %}
     </div>
     {% endfor %}
+
+    {# Add Time Slot Grand Totals Section #}
+{% if time_slot_totals %}
+<div class="page-container" style="page-break-before: always;">
+    <div class="header">
+        <img src="https://i.imgur.com/SO5EWfP.png" alt="GJCLibrary header" />
+    </div>
+    <table class="summary-table">
+        <thead>
+            <tr class="date-row">
+                <th colspan="{{ classifications|length|add:2 }}">
+                    Monthly Time Slot Totals ({{ month }} {{ year }})
+                </th>
+            </tr>
+            <tr>
+                <th class="time-column">Time</th>
+                {% for classification in classifications %}
+                <th class="course-column">
+                    <div class="vertical-text">
+                        {% for letter in classification %}
+                            {% if letter != "-" %}
+                                {{ letter }}<br>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </th>
+                {% endfor %}
+                <th class="total-column">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for time_slot in time_slot_totals %}
+            <tr>
+                <td class="time-column"><span class="time-text">{{ time_slot.time_range }}</span></td>
+                {% for count in time_slot.counts %}
+                <td class="course-column {% if count == 0 %}zero-count{% endif %}">{{ count }}</td>
+                {% endfor %}
+                <td class="total-column">{{ time_slot.total }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <th>Grand Total</th>
+                {% for total in monthly_column_totals %}
+                <td class="course-column {% if total == 0 %}zero-count{% endif %}">{{ total }}</td>
+                {% endfor %}
+                <td class="total-column">{{ monthly_grand_total }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="footer">
+        Page {{ grouped_data|length|add:1 }} of {{ grouped_data|length|add:1 }}
+    </div>
+</div>
+{% endif %}
 </body>
 </html>

@@ -625,6 +625,40 @@ class MonthlyCourseSummaryView(View):
         short_names = self.get_classification_short_names()
         display_classifications = [short_names[cls] for cls in self.get_classifications()]
 
+        # Calculate monthly totals
+        monthly_column_totals = [0] * len(self.get_classifications())
+        monthly_grand_total = 0
+
+        # NEW: Calculate time slot totals
+        time_slot_totals = defaultdict(lambda: {
+            'counts': [0] * len(self.get_classifications()),
+            'total': 0
+        })
+
+        for day_data in monthly_data:
+            # Existing totals
+            for idx, total in enumerate(day_data['column_totals']):
+                monthly_column_totals[idx] += total
+            monthly_grand_total += day_data['grand_total']
+
+            # NEW: Accumulate time slot totals
+            for time_slot in day_data['grid_data']:
+                key = time_slot['time_range']
+                for i, count in enumerate(time_slot['counts']):
+                    time_slot_totals[key]['counts'][i] += count
+                time_slot_totals[key]['total'] += time_slot['row_total']
+
+        # Convert time slot totals to ordered list
+        ordered_time_slots = []
+        for start, end in self.get_hour_ranges():
+            time_key = self.format_time_range(start, end)
+            if time_key in time_slot_totals:
+                ordered_time_slots.append({
+                    'time_range': time_key,
+                    'counts': time_slot_totals[time_key]['counts'],
+                    'total': time_slot_totals[time_key]['total']
+                })
+
         # Group the monthly data into sets of 4 for 2x2 grid layout
         grouped_data = [monthly_data[i:i + 4] for i in range(0, len(monthly_data), 4)]
 
@@ -633,6 +667,9 @@ class MonthlyCourseSummaryView(View):
             'year': year,
             'grouped_data': grouped_data,
             'classifications': display_classifications,
+            'monthly_column_totals': monthly_column_totals,
+            'monthly_grand_total': monthly_grand_total,
+            'time_slot_totals': ordered_time_slots,  # NEW CONTEXT VARIABLE
         }
 
         # Render HTML template
