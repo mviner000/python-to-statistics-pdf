@@ -233,7 +233,7 @@
         </div>
 
         <div class="footer">
-            Page {{ forloop.counter }} of {{ grouped_data|length|add:1 }}
+            Page {{ forloop.counter }} of {{ grouped_data|length|add:3 }}
         </div>
 
         {% if not forloop.last %}
@@ -256,7 +256,7 @@
         </div>     
         
         <div class="combined-section">
-            <!-- Time Slot Grand Totals -->
+            <!-- Monthly Time Slot Grand Totals of different Courses -->
             <table class="summary-table">
                 <thead>
                     <tr class="date-row">
@@ -326,10 +326,45 @@
         </div>
 
         <div class="footer">
-            Page {{ grouped_data|length|add:1 }} of {{ grouped_data|length|add:1 }}
+            Page {{ grouped_data|length|add:2 }} of {{ grouped_data|length|add:2 }}
         </div>
     </div>
     {% endif %}
+
+    <!-- NEW PAGE: Departmental Time Slot Usage Overview -->
+    <div class="page-container" style="page-break-before: always;">
+        <div class="header">
+            <div class="header-image">
+                <img src="https://i.imgur.com/WR78O01.png" alt="GJCLibrary header" />
+            </div>
+            <div class="title-section">
+                Updated Monthly Record of Library Users <span class="school-year">{{ month }} {{ year }}</span>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <table class="summary-table">
+                <tr class="date-row">
+                    <th colspan="{{ classifications|length|add:2 }}">
+                        Departmental Time Slot Usage Overview ({{ month }} {{ year }})
+                    </th>
+                </tr>
+                <tr>
+                    <td colspan="{{ classifications|length|add:2 }}" style="padding: 10px 0;">
+                        <img src="{{ chart_image }}" alt="{{ chart_alt_text }}" 
+                            style="width: 80%; height: auto; display: block; margin: 0 auto;">
+                        <div style="text-align: center; font-size: 7pt; margin-top: 5px;">
+                            Figure 1: Stacked bar chart showing total library usage by time slot and department
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="footer">
+            Page {{ grouped_data|length|add:2 }} of {{ grouped_data|length|add:3 }}
+        </div>
+    </div>
 
 
     {# Combined Purpose Slot Totals and Top Purpose Visitors #}
@@ -407,7 +442,7 @@
         </div>
 
         <div class="footer">
-            Page {{ grouped_data|length|add:2 }} of {{ grouped_data|length|add:2 }}
+            Page {{ grouped_data|length|add:3 }} of {{ grouped_data|length|add:3 }}
         </div>
     </div>
     {% endif %}

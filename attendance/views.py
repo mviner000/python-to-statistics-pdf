@@ -1,4 +1,7 @@
 
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
 
 from django.shortcuts import render
 from django.views.generic import View
@@ -476,7 +479,7 @@ class HourlyCourseSummaryView(View):
             return response
         
         return HttpResponse("Error Rendering PDF", status=400)
-    
+
 class MonthlyCourseSummaryView(View):
     template_name = 'monthly_course_summary_pdf.html'
 
@@ -617,7 +620,6 @@ class MonthlyCourseSummaryView(View):
 
         return monthly_data, start_date, end_date  # Return the date range as well
     
-
     def get(self, request):
         month = request.GET.get('month')
         year = request.GET.get('year')
@@ -683,7 +685,6 @@ class MonthlyCourseSummaryView(View):
             key=lambda x: x['total'], 
             reverse=True
         )
-
 
         # Add rank to each course
         for idx, course in enumerate(sorted_course_totals, start=1):
@@ -780,6 +781,108 @@ class MonthlyCourseSummaryView(View):
         top_purposes_col2 = sorted_purpose_totals[purpose_chunk_size:2*purpose_chunk_size]
         top_purposes_col3 = sorted_purpose_totals[2*purpose_chunk_size:]
 
+        # ===== UPDATED STACKED BAR CHART GENERATION WITH FILTERED PERCENTAGE LABELS =====
+        # Prepare data for chart
+        time_labels = [ts['time_range'] for ts in ordered_time_slots]
+        
+        # Calculate total count for each department for ranking
+        department_totals = []
+        for dept_idx, dept_name in enumerate(display_classifications):
+            total = sum(ts['counts'][dept_idx] for ts in ordered_time_slots)
+            department_totals.append({'name': dept_name, 'total': total, 'index': dept_idx})
+        
+        # Sort departments by total count (highest first)
+        ranked_departments = sorted(department_totals, key=lambda x: x['total'], reverse=True)
+        
+        # Create ordered lists based on ranking
+        ranked_dept_names = [dept['name'] for dept in ranked_departments]
+        ranked_dept_indices = [dept['index'] for dept in ranked_departments]
+        
+        # Create a 2D list of values for each department in rank order
+        department_values = []
+        for idx in ranked_dept_indices:
+            dept_values = [ts['counts'][idx] for ts in ordered_time_slots]
+            department_values.append(dept_values)
+
+        # Generate the chart
+        plt.figure(figsize=(12, 8))  # Increased height from 6 to 8
+        
+        # Use a colormap with enough colors or create a color cycle
+        from itertools import cycle
+        colors = cycle(plt.cm.tab20.colors)  # tab20 has 20 colors
+        
+        bottom = None
+        bars = []
+        
+        # Calculate column sums for percentage calculation
+        column_sums = {}
+        for i, time_label in enumerate(time_labels):
+            column_sums[i] = sum(dept_values[i] for dept_values in department_values)
+
+        # Plot each department's values as stacked bars in rank order
+        for i, (dept_name, values) in enumerate(zip(ranked_dept_names, department_values)):
+            color = next(colors)  # Get next color from the cycle
+            if bottom is None:
+                bar = plt.bar(time_labels, values, color=color, label=dept_name)
+                bottom = values
+            else:
+                bar = plt.bar(time_labels, values, bottom=bottom, color=color, label=dept_name)
+                bottom = [b + v for b, v in zip(bottom, values)]
+            
+            # Calculate and add percentage labels to each segment
+            prev_bottom = [0] * len(values) if i == 0 else [bottom[j] - values[j] for j in range(len(values))]
+            for j, (v, pb) in enumerate(zip(values, prev_bottom)):
+                # Only add percentage labels if:
+                # 1. The value is greater than 0
+                # 2. The total count for this time slot is >= 80
+                # 3. The percentage is >= 3%
+                if v > 0 and column_sums[j] >= 80:  # Add check for minimum 80 counts
+                    percentage = (v / column_sums[j]) * 100 if column_sums[j] > 0 else 0
+                    # Only show percentages 3% and above to reduce congestion
+                    if percentage >= 3:
+                        # Position the label in the middle of the segment
+                        y_pos = pb + v / 2
+                        plt.text(j, y_pos, f"{percentage:.0f}%", ha='center', va='center', 
+                                fontsize=8, fontweight='bold')
+            
+            bars.append(bar)
+        
+        # Add total numbers on top of each bar
+        for i, total in enumerate(column_sums.values()):
+            if total > 0:
+                plt.text(i, total + 1, str(total), ha='center', va='bottom', fontsize=9)
+
+        # Chart styling
+        month_name = calendar.month_name[int(month)]
+        plt.title(f'Monthly Time Slot Usage by Department ({month_name} {year})', fontsize=14, pad=20)
+        plt.xlabel('Time Slots', fontsize=10)
+        plt.ylabel('Total Users', fontsize=10)
+        plt.xticks(rotation=45, ha='right', fontsize=8)
+        plt.yticks(fontsize=8)
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        
+        # Add more vertical space to accommodate the percentages
+        plt.subplots_adjust(bottom=0.15)
+        
+        # Create legend outside the plot with departments in ranked order
+        plt.legend(
+            bbox_to_anchor=(1, 1),
+            loc='upper left',
+            fontsize=11,
+            title='Departments (Ranked)',
+            title_fontsize=12
+        )
+
+        # Save to buffer
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # Encode image for HTML
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.read()).decode()
+        chart_image = f'data:image/png;base64,{image_base64}'
+
         context = {
             'month': datetime(year=year, month=month, day=1).strftime('%B'),
             'year': year,
@@ -799,6 +902,9 @@ class MonthlyCourseSummaryView(View):
             'top_purposes_col1': top_purposes_col1,
             'top_purposes_col2': top_purposes_col2,
             'top_purposes_col3': top_purposes_col3,
+
+            'chart_image': chart_image,
+            'chart_alt_text': 'Stacked bar chart showing monthly time slot usage by department (ranked by usage)'
         }
 
         # Render HTML template
@@ -819,7 +925,7 @@ class MonthlyCourseSummaryView(View):
         response['Content-Disposition'] = f'attachment; filename="monthly_summary_{month}_{year}.pdf"'
         
         return response
-     
+
 class FilteredMonthlyCourseSummaryView(MonthlyCourseSummaryView):
     def get_monthly_data(self, year, month):
         num_days = calendar.monthrange(year, month)[1]
