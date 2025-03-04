@@ -579,6 +579,14 @@ class MonthlyCourseSummaryView(View):
             })
 
         return grid_data, column_totals, grand_total
+    
+    def format_purpose_time_display(self, start_str, end_str):
+        """Format time range into 12-hour format with AM/PM, removing leading zeros."""
+        start = datetime.strptime(start_str, '%H:%M')
+        end = datetime.strptime(end_str, '%H:%M')
+        start_fmt = start.strftime('%I:%M %p').lstrip('0')
+        end_fmt = end.strftime('%I:%M %p').lstrip('0')
+        return f"{start_fmt} - {end_fmt}"
 
     def get_monthly_data(self, year, month):
         num_days = calendar.monthrange(year, month)[1]
@@ -607,7 +615,8 @@ class MonthlyCourseSummaryView(View):
                 'grand_total': grand_total
             })
 
-        return monthly_data
+        return monthly_data, start_date, end_date  # Return the date range as well
+    
 
     def get(self, request):
         month = request.GET.get('month')
@@ -621,7 +630,7 @@ class MonthlyCourseSummaryView(View):
         except (ValueError, TypeError):
             return HttpResponse("Invalid month or year parameters", status=400)
 
-        monthly_data = self.get_monthly_data(year, month)
+        monthly_data, start_date, end_date = self.get_monthly_data(year, month)  # Get the date range
         short_names = self.get_classification_short_names()
         display_classifications = [short_names[cls] for cls in self.get_classifications()]
 
@@ -690,6 +699,61 @@ class MonthlyCourseSummaryView(View):
         # Group the monthly data into sets of 4 for 2x2 grid layout
         grouped_data = [monthly_data[i:i + 4] for i in range(0, len(monthly_data), 4)]
 
+        # ===== NEW CODE FOR PURPOSE SUMMARY =====
+        # Get all attendances for the month
+        attendances = Attendance.objects.filter(
+            time_in_date__date__gte=start_date,
+            time_in_date__date__lte=end_date
+        )
+
+        # Collect purposes and time slot counts
+        purposes = set()
+        purpose_time_counts = defaultdict(lambda: defaultdict(int))
+        time_ranges = self.get_hour_ranges()
+
+        for attendance in attendances:
+            purpose = attendance.purpose.strip().lower() or 'uncategorized'
+            purposes.add(purpose)
+            attendance_time = attendance.time_in_date.time()
+
+            # Determine time slot
+            for start_str, end_str in time_ranges:
+                start = datetime.strptime(start_str, '%H:%M').time()
+                end = datetime.strptime(end_str, '%H:%M').time()
+                if start <= attendance_time < end:
+                    time_slot = self.format_purpose_time_display(start_str, end_str)
+                    purpose_time_counts[time_slot][purpose] += 1
+                    break
+
+        purposes = sorted(purposes)
+        purpose_summary_rows = []
+        grand_totals = defaultdict(int)
+
+        # Build rows for each time slot
+        for start_str, end_str in time_ranges:
+            time_slot_display = self.format_purpose_time_display(start_str, end_str)
+            counts = purpose_time_counts.get(time_slot_display, {})
+            row_counts = [counts.get(purpose, 0) for purpose in purposes]
+            row_total = sum(row_counts)
+            
+            purpose_summary_rows.append({
+                'time': time_slot_display,
+                'counts': row_counts,
+                'total': row_total
+            })
+            
+            # Update grand totals
+            for idx, purpose in enumerate(purposes):
+                grand_totals[purpose] += row_counts[idx]
+
+        # Prepare grand total row
+        grand_total_counts = [grand_totals[purpose] for purpose in purposes]
+        purpose_grand_total_row = {
+            'time': 'Grand Total',
+            'counts': grand_total_counts,
+            'total': sum(grand_total_counts)
+        }
+
         context = {
             'month': datetime(year=year, month=month, day=1).strftime('%B'),
             'year': year,
@@ -702,6 +766,10 @@ class MonthlyCourseSummaryView(View):
             'top_courses_col1': top_courses_col1,
             'top_courses_col2': top_courses_col2,
             'top_courses_col3': top_courses_col3,
+
+            'purpose_summary_headers': purposes,
+            'purpose_summary_rows': purpose_summary_rows,
+            'purpose_grand_total_row': purpose_grand_total_row,
         }
 
         # Render HTML template
@@ -722,7 +790,7 @@ class MonthlyCourseSummaryView(View):
         response['Content-Disposition'] = f'attachment; filename="monthly_summary_{month}_{year}.pdf"'
         
         return response
-    
+     
 class FilteredMonthlyCourseSummaryView(MonthlyCourseSummaryView):
     def get_monthly_data(self, year, month):
         num_days = calendar.monthrange(year, month)[1]
@@ -754,4 +822,4 @@ class FilteredMonthlyCourseSummaryView(MonthlyCourseSummaryView):
                     'grand_total': grand_total
                 })
 
-        return monthly_data
+        return monthly_data, start_date, end_date  # Return the date range to match parent class
