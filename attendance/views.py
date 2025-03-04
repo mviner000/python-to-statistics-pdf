@@ -754,6 +754,32 @@ class MonthlyCourseSummaryView(View):
             'total': sum(grand_total_counts)
         }
 
+        # NEW: Purpose Rankings
+        purpose_totals = []
+        for idx, purpose in enumerate(purposes):
+            purpose_totals.append({
+                'name': purpose.title(),
+                'total': grand_totals[purpose]
+            })
+
+        # Sort purpose totals by count (highest first)
+        sorted_purpose_totals = sorted(
+            purpose_totals,
+            key=lambda x: x['total'],
+            reverse=True
+        )
+
+        # Add rank to each purpose
+        for idx, purpose in enumerate(sorted_purpose_totals, start=1):
+            purpose['rank'] = idx
+
+        # Split purpose rankings into three columns
+        total_purposes = len(sorted_purpose_totals)
+        purpose_chunk_size = (total_purposes + 2) // 3  # Ceiling division
+        top_purposes_col1 = sorted_purpose_totals[:purpose_chunk_size]
+        top_purposes_col2 = sorted_purpose_totals[purpose_chunk_size:2*purpose_chunk_size]
+        top_purposes_col3 = sorted_purpose_totals[2*purpose_chunk_size:]
+
         context = {
             'month': datetime(year=year, month=month, day=1).strftime('%B'),
             'year': year,
@@ -770,6 +796,9 @@ class MonthlyCourseSummaryView(View):
             'purpose_summary_headers': purposes,
             'purpose_summary_rows': purpose_summary_rows,
             'purpose_grand_total_row': purpose_grand_total_row,
+            'top_purposes_col1': top_purposes_col1,
+            'top_purposes_col2': top_purposes_col2,
+            'top_purposes_col3': top_purposes_col3,
         }
 
         # Render HTML template

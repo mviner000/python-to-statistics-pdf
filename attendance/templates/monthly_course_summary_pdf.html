@@ -160,7 +160,7 @@
 
         .title-section {
             position: absolute;
-            top: 98%;
+            top: 108%;
             left: 50%;
             transform: translate(-50%, -50%);
             margin: 0;
@@ -178,7 +178,7 @@
         
     <div class="header">
         <div class="header-image">
-            <img src="https://i.imgur.com/F79vFXz.png" alt="GJCLibrary header" />
+            <img src="https://i.imgur.com/WR78O01.png" alt="GJCLibrary header" />
         </div>
         <div class="title-section">
             Updated Monthly Record of Library Users <span class="school-year">{{ month }} {{ year }}</span>
@@ -248,7 +248,7 @@
     <div class="page-container" style="page-break-before: always;">
         <div class="header">
             <div class="header-image">
-                <img src="https://i.imgur.com/F79vFXz.png" alt="GJCLibrary header" />
+                <img src="https://i.imgur.com/WR78O01.png" alt="GJCLibrary header" />
             </div>
             <div class="title-section">
                 Updated Monthly Record of Library Users <span class="school-year">{{ month }} {{ year }}</span>
@@ -337,7 +337,7 @@
     <div class="page-container" style="page-break-before: always;">
         <div class="header">
             <div class="header-image">
-                <img src="https://i.imgur.com/F79vFXz.png" alt="GJCLibrary header" />
+                <img src="https://i.imgur.com/WR78O01.png" alt="GJCLibrary header" />
             </div>
             <div class="title-section">
                 Updated Monthly Record of Library Users <span class="school-year">{{ month }} {{ year }}</span>
@@ -380,6 +380,31 @@
                 </tr>
             </tbody>
         </table>
+
+        <!-- Top Purpose Visitors Summary -->
+        <div style="width: 90%; margin: 20px auto; display: flex; justify-content: space-between;">
+            <div style="width: 32%;">
+                {% for purpose in top_purposes_col1 %}
+                    <div style="margin-bottom: 5px;">
+                        <span style="font-weight: bold;">{{ purpose.rank }} </span>- {{ purpose.name }} - {{ purpose.total }}
+                    </div>
+                {% endfor %}
+            </div>
+            <div style="width: 32%;">
+                {% for purpose in top_purposes_col2 %}
+                    <div style="margin-bottom: 5px;">
+                        <span style="font-weight: bold;">{{ purpose.rank }} </span>- {{ purpose.name }} - {{ purpose.total }}
+                    </div>
+                {% endfor %}
+            </div>
+            <div style="width: 32%;">
+                {% for purpose in top_purposes_col3 %}
+                    <div style="margin-bottom: 5px;">
+                        <span style="font-weight: bold;">{{ purpose.rank }} </span>- {{ purpose.name }} - {{ purpose.total }}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
 
         <div class="footer">
             Page {{ grouped_data|length|add:2 }} of {{ grouped_data|length|add:2 }}
