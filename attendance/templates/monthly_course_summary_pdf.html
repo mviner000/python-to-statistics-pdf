@@ -7,7 +7,7 @@
             size: 13in 8.5in;
             margin: 0.4in;
         }
-        
+
         body {
             font-family: Arial, sans-serif;
             font-size: 9pt;
@@ -23,13 +23,13 @@
             margin-top: -20px;
             margin-bottom: 0px;
         }
-        
+
         .header img {
             display: inline-block;
             max-width: 60%;
             height: auto;
         }
-        
+
         .header h2 {
             margin: 10px 0;
             font-size: 14pt;
@@ -58,6 +58,25 @@
             font-size: 8pt;
         }
 
+        /* Default alignment for date row */
+        .date-row th {
+            border: none !important;
+            text-align: left;
+            font-style: italic;
+            padding: 2px 0 10px 0;
+            background-color: transparent !important;
+        }
+
+        /* Target odd tables (1st, 3rd, 5th, etc.) for left alignment */
+        .grid-container .summary-table:nth-child(odd) .date-row th {
+            text-align: left;
+        }
+
+        /* Target even tables (2nd, 4th, 6th, etc.) for right alignment */
+        .grid-container .summary-table:nth-child(even) .date-row th {
+            text-align: right;
+        }
+
         .time-column {
             width: 220px;
             text-align: center;
@@ -80,14 +99,6 @@
             width: 20px;
             font-weight: bold;
             background-color: #f2f2f2;
-        }
-
-        .date-row th {
-            border: none !important;
-            text-align: right;
-            font-style: italic;
-            padding: 2px 0 10px 0;
-            background-color: transparent !important;
         }
 
         .vertical-text {
@@ -138,20 +149,39 @@
             flex-direction: column;
             gap: 15px;
         }
-        
+
         /* Adjust heading margin for better spacing */
         .top-course-heading {
             margin: 5px 0;
             font-size: 12pt;
         }
+
+        .title-section {
+            position: absolute;
+            top: 98%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            width: 100%;
+            box-sizing: border-box;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
     </style>
 </head>
 <body>
     {% for group in grouped_data %}
     <div class="page-container">
-        <div class="header">
-            <img src="https://i.imgur.com/SO5EWfP.png" alt="GJCLibrary header" />
+        
+    <div class="header">
+        <div class="header-image">
+            <img src="https://i.imgur.com/F79vFXz.png" alt="GJCLibrary header" />
         </div>
+        <div class="title-section">
+            Updated Monthly Record of Library Users <span class="school-year">{{ month }} {{ year }}</span>
+        </div>
+    </div>
         
         <div class="grid-container">
             {% for daily in group %}
@@ -217,8 +247,13 @@
     {% if time_slot_totals and sorted_course_totals %}
     <div class="page-container" style="page-break-before: always;">
         <div class="header">
-            <img src="https://i.imgur.com/SO5EWfP.png" alt="GJCLibrary header" />
-        </div>
+            <div class="header-image">
+                <img src="https://i.imgur.com/F79vFXz.png" alt="GJCLibrary header" />
+            </div>
+            <div class="title-section">
+                Updated Monthly Record of Library Users <span class="school-year">{{ month }} {{ year }}</span>
+            </div>
+        </div>     
         
         <div class="combined-section">
             <!-- Time Slot Grand Totals -->

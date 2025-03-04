@@ -48,7 +48,7 @@ def import_attendance_data():
         conn = sqlite3.connect('db5.sqlite3')
         cursor = conn.cursor()
         
-        with open('attendance_20250116_20250203_094643.csv', 'r', encoding='utf-8') as file:
+        with open('attendance_20250227_20250303_100357.csv', 'r', encoding='utf-8') as file:
             csv_reader = csv.DictReader(file)
             
             for row_number, row in enumerate(csv_reader, start=2):  # Start from 2 to account for header
